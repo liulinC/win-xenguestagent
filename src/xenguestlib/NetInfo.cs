@@ -53,6 +53,8 @@ namespace xenwinsvc
         XenStoreItem numvif;
         XenStoreItem vifStaticIpSetting;
         const string vifpath = "device/vif";
+        const string VF_KEYWORD = "Virtual Function";
+
         static public void RefreshNetInfo()
         {
             needsRefresh = true;
@@ -138,26 +140,83 @@ namespace xenwinsvc
             catch { }; // If there are no nodes, then we can also ignore failure
         }
 
+        // For the SR-IOV, the VF info needs to be updated to xenstore 
+        // while the PV vif is updated by xenvif drivers
+        private void updateVFXenstoreAttrInfo(string device, NetworkInterface nic,string mac)
+        {
+            if (null == device || nic == null || !isSriovVfDevice(nic)) return; // Only update SR-IOV device
+
+            string deviceID = device.Substring(vifpath.Length + 1);
+            const string DEVICE_NAME = "eth";
+            string nameKey = String.Format("attr/{0}{1}/name",DEVICE_NAME,deviceID);
+            string macKey = String.Format("attr/{0}{1}/mac/0", DEVICE_NAME, deviceID);
+            string ipv4Key = String.Format("attr/{0}{1}/ipv4/0/addr", DEVICE_NAME, deviceID);
+            string ipv6Key = String.Format("attr/{0}{1}/ipv6/0/addr", DEVICE_NAME, deviceID);
+            string ipKey = String.Format("attr/{0}{1}/ip", DEVICE_NAME, deviceID);
+            
+
+            // Update the xenstore info
+            try
+            {
+                // Update name
+                string ipv4 = getIpv4AddrString(nic);
+                XenStoreItem xenName = wmisession.GetXenStoreItem(nameKey);
+                xenName.value = nic.Name;
+
+                // Update mac
+                XenStoreItem xenMac = wmisession.GetXenStoreItem(macKey);
+                xenMac.value = mac;
+
+                // Update ipv
+                XenStoreItem xenIpv4 = wmisession.GetXenStoreItem(ipv4Key);
+                xenIpv4.value = ipv4;
+
+                // Update Ipv6
+                XenStoreItem xenIpv6 = wmisession.GetXenStoreItem(ipv6Key);
+                String ipv6 = null; // Use the last IPv6 addr, the VF only have one valid IPV6
+                foreach (var item in getIpv6Addr(nic))
+                {
+                    ipv6 = item.ToString();
+                }
+                xenIpv6.value = ipv6;
+
+                XenStoreItem xenIp = wmisession.GetXenStoreItem(ipKey);
+                xenIp.value = ipv4;
+            }
+            catch (Exception e)
+            {
+                Debug.Print("updateVFXenstoreAttrInfo error: {0}",e);
+            }
+            
+        }
         bool enablewritedevice = true;
         void writeDevice(string device, NetworkInterface[] nics)
         {
-            if (enablewritedevice) {
-                string mac = wmisession.GetXenStoreItem(device + "/mac").value;
-                foreach (NetworkInterface nic in nics)
-                {
-                    if (macsMatch(mac, nic))
-                    {
+            string mac = wmisession.GetXenStoreItem(device + "/mac").value;
+            foreach (NetworkInterface nic in nics)
+            {
+                 if (macsMatch(mac, nic)) // Find the device
+                 {
+                    if(enablewritedevice){
                         XenStoreItem name = wmisession.GetXenStoreItem("data/vif/" + device.Substring(vifpath.Length + 1) + "/name");
                         name.value = nic.Name;
-                        if (name.GetStatus() != ManagementStatus.NoError) {
+                        if (name.GetStatus() != ManagementStatus.NoError)
+                        {
                             enablewritedevice = false;
                             return;
                         }
                     }
-                }
+                 }
             }
+            
         }
 
+        private bool isSriovVfDevice(NetworkInterface nic)
+        {
+            if (null == nic || null == nic.Description) return false;
+            return nic.Description.Contains(VF_KEYWORD);
+          
+        }
 
         private void updateNetworkInfo()
         {
