@@ -182,6 +182,7 @@ namespace xenwinsvc
 
                 XenStoreItem xenIp = wmisession.GetXenStoreItem(ipKey);
                 xenIp.value = ipv4;
+                Debug.Print("update VF info success");
             }
             catch (Exception e)
             {
@@ -189,15 +190,30 @@ namespace xenwinsvc
             }
             
         }
+
+        void updateVFXenstoreInfo(string device, NetworkInterface[] nics)
+        {
+          string mac = wmisession.GetXenStoreItem(device + "/mac").value;
+          foreach (NetworkInterface nic in nics)
+          {
+            if (macsMatch(mac, nic))
+            {
+                updateVFXenstoreAttrInfo(device, nic, mac);    
+            }
+          }      
+        }
+
         bool enablewritedevice = true;
         void writeDevice(string device, NetworkInterface[] nics)
         {
-            string mac = wmisession.GetXenStoreItem(device + "/mac").value;
-            foreach (NetworkInterface nic in nics)
+            if (enablewritedevice)
             {
-                 if (macsMatch(mac, nic)) // Find the device
-                 {
-                    if(enablewritedevice){
+                string mac = wmisession.GetXenStoreItem(device + "/mac").value;
+                foreach (NetworkInterface nic in nics)
+                {
+                    if (macsMatch(mac, nic))
+                    {
+                        // Update the attr field
                         XenStoreItem name = wmisession.GetXenStoreItem("data/vif/" + device.Substring(vifpath.Length + 1) + "/name");
                         name.value = nic.Name;
                         if (name.GetStatus() != ManagementStatus.NoError)
@@ -206,9 +222,8 @@ namespace xenwinsvc
                             return;
                         }
                     }
-                 }
+                }
             }
-            
         }
 
         private bool isSriovVfDevice(NetworkInterface nic)
@@ -243,6 +258,7 @@ namespace xenwinsvc
                         foreach (string device in devices)
                         {
                             writeDevice(device, nics);
+                            updateVFXenstoreInfo(device, nics);
                         }
                     }
                     catch (Exception){
