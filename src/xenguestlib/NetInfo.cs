@@ -38,6 +38,9 @@ using System.Diagnostics;
 using System.ServiceProcess;
 using Microsoft.Win32;
 using System.Linq;
+using xenguestlib;
+using System.Text;
+
 
 namespace xenwinsvc
 {
@@ -76,6 +79,7 @@ namespace xenwinsvc
         {
             try
             {
+                showPermitAddress();
                 updateNicStatus();
             }
             catch (System.Management.ManagementException x)
@@ -92,6 +96,47 @@ namespace xenwinsvc
             return true;
         }
 
+        public void showPermitAddress() 
+        {
+
+            try
+            {
+                Util.MIB_IF_TABLE2 mibIfTable2 =  Util.GetMIB2Interface();
+                Debug.Print("size: ==>" + mibIfTable2.NumEntries);
+                for (int i = 0; i < mibIfTable2.NumEntries; i++ )
+                {
+                    Debug.Print("InterfaceLuid: {0}", mibIfTable2.Table[i].InterfaceLuid);
+                    Debug.Print("    InterfaceIndex: {0} ", mibIfTable2.Table[i].InterfaceIndex);
+                    Debug.Print("    GUID: {0}", mibIfTable2.Table[i].GUID.ToString());
+                    Debug.Print("    Alias: {0}", mibIfTable2.Table[i].Alias.ToString());
+                    Debug.Print("    Description: {0}", mibIfTable2.Table[i].Description);
+                    Debug.Print("    PhysicalAddressLength: {0}", mibIfTable2.Table[i].PhysicalAddressLength);
+
+                    Debug.Print("    PhysicalAddress: {0}:{1}:{2}:{3}:{4}:{5}",
+                       mibIfTable2.Table[i].PhysicalAddress[0].ToString("x2"),
+                       mibIfTable2.Table[i].PhysicalAddress[1].ToString("x2"),
+                       mibIfTable2.Table[i].PhysicalAddress[2].ToString("x2"),
+                       mibIfTable2.Table[i].PhysicalAddress[3].ToString("x2"),
+                       mibIfTable2.Table[i].PhysicalAddress[4].ToString("x2"),
+                       mibIfTable2.Table[i].PhysicalAddress[5].ToString("x2")
+                       );
+
+                    Debug.Print("    PermanentPhysicalAddress: {0}:{1}:{2}:{3}:{4}:{5}",
+                        mibIfTable2.Table[i].PermanentPhysicalAddress[0].ToString("x2"),
+                        mibIfTable2.Table[i].PermanentPhysicalAddress[1].ToString("x2"),
+                        mibIfTable2.Table[i].PermanentPhysicalAddress[2].ToString("x2"),
+                        mibIfTable2.Table[i].PermanentPhysicalAddress[3].ToString("x2"),
+                        mibIfTable2.Table[i].PermanentPhysicalAddress[4].ToString("x2"),
+                        mibIfTable2.Table[i].PermanentPhysicalAddress[5].ToString("x2")
+                        );
+                }
+            }
+            catch (Exception e)
+            {
+
+                Debug.Print("get exception: {0}", e);
+            }
+        }
         /// <summary>
         /// When catch the changes inside VM about the NIC
         /// </summary>
